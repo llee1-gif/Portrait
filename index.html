@@ -1,0 +1,965 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Portrait">
+<meta name="theme-color" content="#000000">
+<link rel="apple-touch-icon" href="queen.jpg">
+<title>Living Portrait</title>
+<style>
+  :root {
+    --bg: #000;
+    --panel: #15101c;
+    --panel-2: #1f1829;
+    --line: #3a2f47;
+    --text: #efe9f5;
+    --muted: #a99bb8;
+    --accent: #b57bff;
+    --gold: #d8b25a;
+    --danger: #ff6b7a;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    overflow: hidden; touch-action: none;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", sans-serif;
+  }
+  #stage { position: fixed; inset: 0; background: #000; }
+  #portrait { width: 100%; height: 100%; display: block; object-fit: cover; object-position: 50% 32%; }
+  body.framed #stage { padding: clamp(18px, 4vmin, 42px); background:
+      linear-gradient(135deg, #6b4a17, #e9c877 22%, #7a5419 45%, #f3d98f 62%, #6b4a17 85%, #c9a14e); }
+  body.framed #portrait { box-shadow: inset 0 0 0 2px #2a1a05, 0 0 0 3px #2a1a05, 0 0 30px rgba(0,0,0,.9) inset; }
+
+  #cam { position: fixed; left: 0; top: 0; width: 2px; height: 2px; opacity: 0.01; pointer-events: none; }
+
+  /* start screen */
+  #start {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at 50% 40%, rgba(40,10,60,.55), rgba(0,0,0,.88));
+    padding: 16px; z-index: 20;
+  }
+  #start .card {
+    max-width: 440px; width: 100%; text-align: center; padding: 28px 24px;
+    background: rgba(20,14,28,.85); border: 1px solid var(--line); border-radius: 18px;
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  }
+  #start h1 { margin: 0 0 8px; font-size: 24px; letter-spacing: .02em; color: var(--gold); font-weight: 700; }
+  #start p { margin: 6px 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
+  #start .err { color: var(--danger); }
+  .btn {
+    appearance: none; border: 1px solid var(--line); background: var(--panel-2); color: var(--text);
+    font: inherit; font-size: 14px; padding: 9px 14px; border-radius: 10px; cursor: pointer;
+    touch-action: manipulation;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #140a20; font-weight: 700; }
+  .btn.big { font-size: 17px; padding: 14px 22px; margin-top: 16px; }
+  .btn.danger { color: var(--danger); }
+  .btn.rec { color: #ff9aa6; }
+  .btn.rec.on { background: var(--danger); color: #fff; border-color: var(--danger); }
+
+  /* settings sheet */
+  #settings {
+    position: fixed; top: 0; right: 0; bottom: 0; width: min(480px, 100%);
+    background: var(--panel); border-left: 1px solid var(--line); z-index: 30;
+    overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y;
+    padding: max(16px, env(safe-area-inset-top)) 16px 40px;
+    transform: translateX(105%); transition: transform .25s ease;
+    -webkit-user-select: text; user-select: text;
+  }
+  #settings.open { transform: none; }
+  #settings h2 { font-size: 20px; margin: 4px 0 4px; color: var(--gold); }
+  #settings h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 22px 0 8px; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.05); font-size: 14px; }
+  .row label { flex: 1; }
+  .row small { color: var(--muted); display: block; font-size: 12px; margin-top: 2px; }
+  .row input[type=range] { width: 150px; accent-color: var(--accent); }
+  .row input[type=number], .row select { width: 150px; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font: inherit; font-size: 14px; }
+  .row input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--accent); }
+  .val { color: var(--accent); font-variant-numeric: tabular-nums; min-width: 42px; text-align: right; font-size: 13px; }
+  .line-item { background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-bottom: 10px; }
+  .line-item textarea {
+    width: 100%; min-height: 64px; resize: vertical; background: #0e0a13; color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px; font: inherit; font-size: 14px; line-height: 1.45;
+  }
+  .line-item .tools { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }
+  .line-item .tools .btn { padding: 6px 10px; font-size: 13px; }
+  .tag { font-size: 12px; color: #9fe3b0; }
+  .tag.none { color: var(--muted); }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+  .hint { color: var(--muted); font-size: 12px; line-height: 1.5; }
+
+  /* debug */
+  #debug {
+    position: fixed; left: 10px; bottom: 10px; z-index: 15; display: none;
+    background: rgba(0,0,0,.7); border: 1px solid var(--line); border-radius: 10px; padding: 8px;
+    font: 12px/1.4 ui-monospace, Menlo, monospace; color: #cfe;
+  }
+  body.debug #debug { display: block; }
+  #debug canvas { display: block; width: 192px; height: 144px; image-rendering: pixelated; border-radius: 6px; }
+  #meter { height: 6px; background: #222; border-radius: 3px; margin-top: 6px; position: relative; overflow: hidden; }
+  #meter i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); width: 0; }
+  #meter b { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #ff0; }
+  #meter b.near { background: #f60; }
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="portrait" width="1200" height="1592"></canvas></div>
+<video id="cam" playsinline muted autoplay></video>
+
+<div id="debug">
+  <canvas id="dbg" width="64" height="48"></canvas>
+  <div id="meter"><i></i><b class="trig"></b><b class="near"></b></div>
+  <div id="dbgText">—</div>
+</div>
+
+<div id="start">
+  <div class="card">
+    <h1>Living Portrait</h1>
+    <p>When the camera detects motion, the portrait wakes up and speaks.</p>
+    <p>Settings: <b>tap the top-left corner 5 times</b> (or press <b>S</b>)</p>
+    <p id="startMsg"></p>
+    <button class="btn primary big" id="startBtn">Start</button>
+  </div>
+</div>
+
+<aside id="settings" aria-label="Settings">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <h2>Portrait Settings</h2>
+    <button class="btn" id="closeSettings">Close</button>
+  </div>
+  <p class="hint">Settings save automatically on this device. Detection is paused while this panel is open.</p>
+
+  <h3>Detection</h3>
+  <div class="row"><label>Sensitivity<small>% of the view that must move to wake her (lower = more sensitive)</small></label><input type="range" data-k="sensitivity" min="0.5" max="15" step="0.5"><span class="val"></span></div>
+  <div class="row"><label>"Up close" level<small>Above this, she says a long line</small></label><input type="range" data-k="nearLevel" min="4" max="60" step="1"><span class="val"></span></div>
+  <div class="row"><label>Cooldown (sec)<small>Wait after speaking before she can wake again</small></label><input type="number" data-k="cooldown" min="0" max="600" step="1"></div>
+  <div class="row"><label>Linger (sec)<small>Stays awake after speaking; extended while motion continues</small></label><input type="number" data-k="linger" min="0" max="60" step="1"></div>
+  <div class="row"><label>Tap screen to wake</label><input type="checkbox" data-k="tapTrigger"></div>
+  <div class="row"><label>Flip gaze direction<small>Turn on if her eyes look away from people</small></label><input type="checkbox" data-k="flipGaze"></div>
+  <div class="row"><label>Show debug<small>Camera motion view and numbers</small></label><input type="checkbox" data-k="debug"></div>
+
+  <h3>Voice</h3>
+  <div class="row"><label>Voice (TTS)<small>Used for lines without a recording</small></label><select data-k="voiceURI" id="voiceSel"></select></div>
+  <div class="row"><label>Rate</label><input type="range" data-k="rate" min="0.5" max="1.4" step="0.05"><span class="val"></span></div>
+  <div class="row"><label>Pitch</label><input type="range" data-k="pitch" min="0.3" max="1.6" step="0.05"><span class="val"></span></div>
+  <div class="row"><label>Volume</label><input type="range" data-k="volume" min="0" max="1" step="0.05"><span class="val"></span></div>
+  <div class="row"><label>Magic chime on wake</label><input type="checkbox" data-k="chime"></div>
+  <div class="row"><label>Line order</label><select data-k="order"><option value="sequential">In order</option><option value="random">Random</option></select></div>
+
+  <h3>Display</h3>
+  <div class="row"><label>Dim while asleep<small>Brightens when she wakes</small></label><input type="range" data-k="dim" min="0" max="0.5" step="0.01"><span class="val"></span></div>
+  <div class="row"><label>Purple aura</label><input type="range" data-k="glow" min="0" max="1.5" step="0.05"><span class="val"></span></div>
+  <div class="row"><label>Head movement</label><input type="range" data-k="motionAmt" min="0" max="2" step="0.1"><span class="val"></span></div>
+  <div class="row"><label>Gold frame border on screen</label><input type="checkbox" data-k="framed"></div>
+
+  <h3>Lines — passing by (short)</h3>
+  <div id="lines-short"></div>
+  <button class="btn" data-add="short">+ Add line</button>
+
+  <h3>Lines — up close (long)</h3>
+  <div id="lines-long"></div>
+  <button class="btn" data-add="long">+ Add line</button>
+
+  <p class="hint" style="margin-top:14px">Attach a 🎙 recording or 📁 audio file to a line and it plays that real voice instead of TTS; the mouth follows the loudness.</p>
+
+  <div class="actions">
+    <button class="btn primary" data-test="short">Test short line</button>
+    <button class="btn primary" data-test="long">Test long line</button>
+    <button class="btn danger" id="resetBtn">Reset to defaults</button>
+  </div>
+</aside>
+
+<script>
+(() => {
+'use strict';
+
+/* ------------------------------------------------------------------ *
+ *  Settings
+ * ------------------------------------------------------------------ */
+const uid = () => Math.random().toString(36).slice(2, 10);
+const DEFAULT_LINES = {
+  short: [
+    "Who dares to wander through my halls?",
+    "Stop right there... yes, you. Come closer, my dear.",
+    "Mirror, mirror... oh. It's only another visitor.",
+  ],
+  long: [
+    "Ah, a visitor. I am the Queen: mistress of this castle, keeper of the magic mirror, and the fairest in all the land. Or so my mirror tells me... when it knows what's good for it.",
+    "Don't be frightened, dearie. I've brought you a gift. A lovely apple, freshly picked this very night. Just one little bite... and you'll never have to worry about anything ever again.",
+    "They call me wicked. I prefer the word... ambitious. Every kingdom needs a queen willing to do what must be done. Now run along, before I change my mind.",
+  ],
+};
+const DEFAULTS = {
+  sensitivity: 3, nearLevel: 18, cooldown: 12, linger: 4,
+  tapTrigger: true, flipGaze: false, debug: false,
+  voiceURI: '', rate: 0.88, pitch: 0.8, volume: 1, chime: true, order: 'sequential',
+  dim: 0.14, glow: 1, motionAmt: 1, framed: false,
+  lines: {
+    short: DEFAULT_LINES.short.map(text => ({ id: uid(), text })),
+    long: DEFAULT_LINES.long.map(text => ({ id: uid(), text })),
+  },
+};
+const STORE_KEY = 'living-portrait-settings-v1';
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) return Object.assign(structuredClone(DEFAULTS), JSON.parse(raw));
+  } catch (e) {}
+  return structuredClone(DEFAULTS);
+}
+let cfg = loadSettings();
+function saveSettings() { try { localStorage.setItem(STORE_KEY, JSON.stringify(cfg)); } catch (e) {} }
+
+/* ------------------------------------------------------------------ *
+ *  Recorded clips (IndexedDB)
+ * ------------------------------------------------------------------ */
+const clipIds = new Set();
+const dbReady = new Promise((res, rej) => {
+  try {
+    const r = indexedDB.open('living-portrait', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('clips');
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  } catch (e) { rej(e); }
+});
+async function idb(mode, fn) {
+  const db = await dbReady;
+  return new Promise((res, rej) => {
+    const tx = db.transaction('clips', mode);
+    const req = fn(tx.objectStore('clips'));
+    tx.oncomplete = () => res(req && req.result);
+    tx.onerror = () => rej(tx.error);
+  });
+}
+const clipGet = id => idb('readonly', s => s.get(id)).catch(() => null);
+const clipPut = (id, blob) => idb('readwrite', s => s.put(blob, id)).then(() => clipIds.add(id));
+const clipDel = id => idb('readwrite', s => s.delete(id)).then(() => clipIds.delete(id));
+idb('readonly', s => s.getAllKeys()).then(keys => { (keys || []).forEach(k => clipIds.add(k)); renderLines(); }).catch(() => {});
+
+/* ------------------------------------------------------------------ *
+ *  WebGL portrait renderer
+ * ------------------------------------------------------------------ */
+const IMG_W = 600, IMG_H = 815, VIEW_H = 796;   // bottom caption strip is cropped
+const cv = document.getElementById('portrait');
+const gl = cv.getContext('webgl', { antialias: false, premultipliedAlpha: false });
+
+const VS = `
+attribute vec2 aPos; varying vec2 vUv;
+void main(){ vUv = aPos * 0.5 + 0.5; gl_Position = vec4(aPos, 0.0, 1.0); }`;
+
+const FS = `
+precision highp float;
+varying vec2 vUv;
+uniform sampler2D uTex;
+uniform vec2 uImg, uView;
+uniform float uMouth, uBlinkL, uBlinkR, uBrow, uAlive, uTime, uDim, uGlow;
+uniform vec2 uGaze;
+uniform vec3 uHead;   // rotation (rad), tx, ty (px)
+
+const vec2 MOUTH  = vec2(321.5, 370.0);
+const vec2 EYE_L  = vec2(256.0, 264.0);
+const vec2 EYE_R  = vec2(395.0, 266.0);
+const vec2 HEAD_C = vec2(322.0, 290.0);
+const vec2 PIVOT  = vec2(322.0, 480.0);
+
+vec2 headWarp(vec2 p){
+  float w = 1.0 - smoothstep(200.0, 380.0, distance(p, HEAD_C));
+  vec2 q = p - PIVOT;
+  float a = -uHead.x * w, c = cos(a), s = sin(a);
+  q = vec2(c*q.x - s*q.y, s*q.x + c*q.y);
+  return q + PIVOT - uHead.yz * w;
+}
+
+// jaw drop: the lower lip + chin move down, upper lip and teeth lift slightly.
+// The split follows the top edge of the lower lip; the opened gap becomes the mouth interior.
+vec2 mouthWarp(vec2 p, inout float gap){
+  float dx = (p.x - MOUTH.x) / 40.0;
+  float prof = pow(max(0.0, 1.0 - dx*dx), 0.65);
+  float line = MOUTH.y + 5.0 * min(dx*dx, 1.3);
+  float dxw = (p.x - MOUTH.x) / 88.0;
+  float wide = max(0.0, 1.0 - dxw*dxw);
+  if (p.y >= line) {
+    float shape = mix(prof, wide * 0.8, smoothstep(line, line + 60.0, p.y));
+    float fall = 1.0 - smoothstep(line + 30.0, 500.0, p.y);
+    float sy = p.y - uMouth * 15.0 * shape * fall;
+    gap = max(gap, line - sy);
+    p.y = sy;
+  } else {
+    float sy = p.y + uMouth * 3.0 * prof * smoothstep(322.0, line, p.y);
+    gap = max(gap, (sy - line) * 3.0);
+    p.y = sy;
+  }
+  return p;
+}
+
+// upper lid slides down by stretching the eyeshadow above it
+vec2 blinkWarp(vec2 p, vec2 C, float ew, float ht, float hb, float b, inout float lash){
+  float dx = (p.x - C.x) / ew;
+  float prof = sqrt(max(0.0, 1.0 - dx*dx));
+  float top = C.y - ht * prof;
+  float bot = C.y + hb * prof;
+  float lid = mix(top, bot - 0.5, b);
+  float st = C.y - ht - 30.0;
+  if (p.y > st && p.y < lid) {
+    lash = max(lash, b * prof * (1.0 - smoothstep(0.0, 3.0, lid - p.y)));
+    p.y = st + (p.y - st) / (lid - st) * (top - st);
+  }
+  return p;
+}
+
+vec2 gazeWarp(vec2 p, vec2 C, float ew, float h, float b){
+  vec2 d = vec2((p.x - C.x) / (ew * 0.8), (p.y - C.y) / (h * 1.5));
+  float m = 1.0 - smoothstep(0.5, 1.0, length(d));
+  return p - uGaze * m * (1.0 - b);
+}
+
+vec2 browWarp(vec2 p){
+  float yb = smoothstep(172.0, 200.0, p.y) * (1.0 - smoothstep(226.0, 252.0, p.y));
+  float xl = 1.0 - smoothstep(0.0, 1.0, abs(p.x - 262.0) / 60.0);
+  float xr = 1.0 - smoothstep(0.0, 1.0, abs(p.x - 392.0) / 62.0);
+  p.y += uBrow * 5.0 * yb * max(xl, xr);
+  return p;
+}
+
+void main(){
+  vec2 sp = vec2(vUv.x * uView.x, (1.0 - vUv.y) * uView.y);
+  vec2 p = headWarp(sp);
+  float gap = 0.0, lash = 0.0;
+  p = mouthWarp(p, gap);
+  p = browWarp(p);
+  p = blinkWarp(p, EYE_L, 35.0, 11.0, 10.0, uBlinkL, lash);
+  p = blinkWarp(p, EYE_R, 38.0, 11.0, 11.0, uBlinkR, lash);
+  p = gazeWarp(p, EYE_L, 35.0, 11.0, uBlinkL);
+  p = gazeWarp(p, EYE_R, 38.0, 11.0, uBlinkR);
+
+  vec3 col = texture2D(uTex, clamp(p, vec2(0.5), uImg - 0.5) / uImg).rgb;
+
+  float lum = dot(col, vec3(0.299, 0.587, 0.114));
+  float r = distance(sp, vec2(322.0, 300.0)) / 430.0;
+  float pulse = 0.78 + 0.22 * sin(uTime * 1.6);
+  col += vec3(0.32, 0.05, 0.60) * uGlow * uAlive * pulse * (1.0 - smoothstep(0.15, 1.0, r)) * pow(1.0 - lum, 3.0) * 0.55;
+
+  if (gap > 0.0) {
+    // reddish near the lower lip (tongue), dark in the shadow under the teeth
+    vec3 inner = mix(vec3(0.30, 0.06, 0.08), vec3(0.05, 0.01, 0.015), smoothstep(0.0, 7.0, gap));
+    col = mix(col, inner, smoothstep(0.0, 1.3, gap));
+  }
+  col = mix(col, col * 0.25, lash * 0.85);
+
+  float dim = uDim * (1.0 - uAlive);
+  col = mix(vec3(lum), col, 1.0 - dim * 0.9) * (1.0 - dim);
+  gl_FragColor = vec4(col, 1.0);
+}`;
+
+let U = {}, glReady = false;
+function initGL(img) {
+  if (!gl) return false;
+  const sh = (type, src) => {
+    const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  };
+  const prog = gl.createProgram();
+  gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS));
+  gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+  gl.useProgram(prog);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, 'aPos');
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, img);
+  ['uTex','uImg','uView','uMouth','uBlinkL','uBlinkR','uBrow','uAlive','uTime','uDim','uGlow','uGaze','uHead']
+    .forEach(n => U[n] = gl.getUniformLocation(prog, n));
+  gl.uniform1i(U.uTex, 0);
+  gl.uniform2f(U.uImg, IMG_W, IMG_H);
+  gl.uniform2f(U.uView, IMG_W, VIEW_H);
+  gl.viewport(0, 0, cv.width, cv.height);
+  return true;
+}
+
+function draw(t) {
+  if (!glReady) return;
+  const m = cfg.motionAmt * A.alive;
+  gl.uniform1f(U.uMouth, A.mouth);
+  gl.uniform1f(U.uBlinkL, A.blinkL);
+  gl.uniform1f(U.uBlinkR, A.blinkR);
+  gl.uniform1f(U.uBrow, A.brow * A.alive);
+  gl.uniform1f(U.uAlive, A.alive);
+  gl.uniform1f(U.uTime, t / 1000);
+  gl.uniform1f(U.uDim, cfg.dim);
+  gl.uniform1f(U.uGlow, cfg.glow);
+  gl.uniform2f(U.uGaze, A.gaze[0] * A.alive, A.gaze[1] * A.alive);
+  gl.uniform3f(U.uHead, A.head[0] * m, A.head[1] * m, A.head[2] * m);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+
+const img = new Image();
+img.onload = () => {
+  try { glReady = initGL(img); } catch (e) { console.error(e); }
+  if (!glReady) {   // static fallback
+    const c2 = cv.getContext('2d');
+    if (c2) c2.drawImage(img, 0, 0, IMG_W, VIEW_H, 0, 0, cv.width, cv.height);
+  }
+  dirty = true;
+};
+img.src = 'queen.jpg';
+
+/* ------------------------------------------------------------------ *
+ *  Animation state
+ * ------------------------------------------------------------------ */
+const A = {
+  alive: 0, mouth: 0, blinkL: 0, blinkR: 0, brow: 0, browT: 0,
+  gaze: [0, 0], gazeT: [0, 0], head: [0, 0, 0],
+};
+const S = {
+  mode: 'idle',              // idle | waking | speaking | linger | sleeping
+  token: 0, cooldownUntil: 0, lingerUntil: 0, lingerCap: 0, didLong: false,
+  nextBlink: 0, blinkAt: -1e9, blinkDouble: false,
+  lastMotionX: 0.5, lastMotionY: 0.45, lastMotionAt: 0,
+  nextSaccade: 0, saccade: [0, 0],
+};
+const talk = { tts: false, clip: false, kick: false, syl: 0, sylNext: 0 };
+let dirty = true;
+let started = false, paused = false;
+
+function blinkCurve(ms) {         // 0..1 lid closure for time since blink start
+  if (ms < 0) return 0;
+  if (ms < 70) return ms / 70;
+  if (ms < 110) return 1;
+  if (ms < 200) return 1 - (ms - 110) / 90;
+  return 0;
+}
+const approach = (v, target, rate, dt) => v + (target - v) * (1 - Math.exp(-rate * dt));
+
+function update(now, dt) {
+  const t = now / 1000;
+  const awake = S.mode === 'waking' || S.mode === 'speaking' || S.mode === 'linger';
+  const prevAlive = A.alive;
+  A.alive = awake ? Math.min(1, A.alive + dt / 0.7) : Math.max(0, A.alive - dt / 1.6);
+
+  // --- mouth
+  let mt = 0;
+  if (talk.clip && analyser) {
+    analyser.getFloatTimeDomainData(anaBuf);
+    let sum = 0; for (let i = 0; i < anaBuf.length; i++) sum += anaBuf[i] * anaBuf[i];
+    const rms = Math.sqrt(sum / anaBuf.length);
+    mt = Math.min(1, Math.max(0, (rms - 0.012) * 9));
+  } else if (talk.tts) {
+    if (talk.kick || now > talk.sylNext) {
+      const closed = !talk.kick && Math.random() < 0.2;
+      talk.syl = closed ? 0.05 : 0.3 + Math.random() * 0.7;
+      talk.sylNext = now + (75 + Math.random() * 105) / Math.max(0.5, cfg.rate);
+      talk.kick = false;
+    }
+    mt = talk.syl;
+  }
+  A.mouth = approach(A.mouth, mt, mt > A.mouth ? 28 : 18, dt);
+  if (!awake && A.alive === 0) A.mouth = 0;
+
+  // --- blinking (only while awake)
+  if (A.alive > 0.4 && now > S.nextBlink) {
+    S.blinkAt = now;
+    S.blinkDouble = Math.random() < 0.15;
+    S.nextBlink = now + 2200 + Math.random() * 3800;
+  }
+  let b = blinkCurve(now - S.blinkAt);
+  if (S.blinkDouble) b = Math.max(b, blinkCurve(now - S.blinkAt - 260));
+  A.blinkL = A.blinkR = A.alive > 0 ? b : 0;
+
+  // --- gaze toward the person (from camera), plus micro-saccades
+  if (now > S.nextSaccade) {
+    S.saccade = [(Math.random() - 0.5) * 1.2, (Math.random() - 0.5) * 0.6];
+    S.nextSaccade = now + 600 + Math.random() * 1400;
+  }
+  const recent = now - S.lastMotionAt < 2500;
+  let gx = recent ? (0.5 - S.lastMotionX) * 2 : 0;
+  if (cfg.flipGaze) gx = -gx;
+  const gy = recent ? (S.lastMotionY - 0.45) * 1.2 : 0;
+  A.gazeT = [Math.max(-1, Math.min(1, gx)) * 3.2 + S.saccade[0], gy * 1.2 + S.saccade[1]];
+  A.gaze[0] = approach(A.gaze[0], A.gazeT[0], 14, dt);
+  A.gaze[1] = approach(A.gaze[1], A.gazeT[1], 14, dt);
+
+  // --- brows: interest on wake + emphasis while speaking
+  if ((talk.tts || talk.clip) && Math.random() < dt * 0.6) A.browT = 0.5 + Math.random() * 0.5;
+  A.browT = approach(A.browT, 0, 1.2, dt);
+  A.brow = approach(A.brow, A.browT, 8, dt);
+
+  // --- head sway, nods with speech, turns slightly toward the person
+  A.head[0] = 0.010 * Math.sin(t * 0.37) + 0.006 * Math.sin(t * 0.91 + 1.3) + A.gaze[0] * 0.0015 + A.mouth * 0.004;
+  A.head[1] = 2.2 * Math.sin(t * 0.23 + 0.4) + A.gaze[0] * 0.6;
+  A.head[2] = 1.4 * Math.sin(t * 0.51) + A.mouth * 1.6;
+
+  if (S.mode === 'linger' && now > S.lingerUntil) goSleep();
+  if (S.mode === 'sleeping' && A.alive === 0) {
+    S.mode = 'idle';
+    S.cooldownUntil = now + cfg.cooldown * 1000;
+    dirty = true;
+  }
+  if (A.alive > 0 || prevAlive > 0) dirty = true;
+  if (window.portrait && window.portrait.override) { Object.assign(A, window.portrait.override); dirty = true; }
+}
+
+function frame(now) {
+  update(now, Math.min(0.05, (now - (frame.last || now)) / 1000));
+  frame.last = now;
+  if (dirty) { draw(now); dirty = false; }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ------------------------------------------------------------------ *
+ *  Behaviour
+ * ------------------------------------------------------------------ */
+const lineIdx = { short: 0, long: 0 };
+function pickLine(kind) {
+  const list = cfg.lines[kind].filter(l => l.text.trim() || clipIds.has(l.id));
+  if (!list.length) return null;
+  let i;
+  if (cfg.order === 'random') {
+    i = Math.floor(Math.random() * list.length);
+    if (list.length > 1 && i === lineIdx[kind]) i = (i + 1) % list.length;
+    lineIdx[kind] = i;
+  } else {
+    i = lineIdx[kind] % list.length;
+    lineIdx[kind] = i + 1;
+  }
+  return list[i];
+}
+
+function wake(near, line) {
+  if (S.mode !== 'idle' && S.mode !== 'sleeping') return;
+  const tok = ++S.token;
+  S.mode = 'waking';
+  S.didLong = near;
+  S.nextBlink = performance.now() + 350;
+  A.browT = 0.9;
+  if (cfg.chime) chime();
+  setTimeout(() => {
+    if (tok !== S.token) return;
+    speak(line || pickLine(near ? 'long' : 'short'), tok);
+  }, 750);
+}
+
+async function speak(line, tok) {
+  S.mode = 'speaking';
+  if (line) {
+    try {
+      const blob = clipIds.has(line.id) ? await clipGet(line.id) : null;
+      if (blob) await playClip(blob); else await speakTTS(line.text);
+    } catch (e) { console.warn(e); }
+  }
+  if (tok !== S.token) return;
+  talk.tts = talk.clip = false;
+  S.mode = 'linger';
+  const now = performance.now();
+  S.lingerUntil = now + cfg.linger * 1000;
+  S.lingerCap = now + cfg.linger * 1000 + 20000;
+}
+
+function goSleep() {
+  S.token++;
+  S.mode = 'sleeping';
+  talk.tts = talk.clip = false;
+  try { speechSynthesis.cancel(); } catch (e) {}
+  if (currentSrc) { try { currentSrc.stop(); } catch (e) {} currentSrc = null; }
+}
+
+function onPresence(score, near) {
+  const now = performance.now();
+  if (paused || !started) return;
+  if (S.mode === 'idle' && now > S.cooldownUntil) {
+    wake(near);
+  } else if (S.mode === 'linger') {
+    S.lingerUntil = Math.min(S.lingerCap, Math.max(S.lingerUntil, now + 2500));
+    if (near && !S.didLong) {
+      S.didLong = true;
+      const tok = ++S.token;
+      speak(pickLine('long'), tok);
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ *  Audio: TTS, recorded clips, chime
+ * ------------------------------------------------------------------ */
+let ac = null, master = null, analyser = null, anaBuf = null, currentSrc = null;
+function initAudio() {
+  if (ac) return;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  ac = new AC();
+  master = ac.createGain(); master.connect(ac.destination);
+  analyser = ac.createAnalyser(); analyser.fftSize = 1024; analyser.connect(master);
+  anaBuf = new Float32Array(analyser.fftSize);
+}
+
+let voices = [];
+function loadVoices() {
+  try { voices = speechSynthesis.getVoices() || []; } catch (e) { voices = []; }
+  const sel = document.getElementById('voiceSel');
+  sel.innerHTML = '<option value="">Automatic</option>' + voices
+    .map(v => `<option value="${v.voiceURI.replace(/"/g, '&quot;')}">${v.name} (${v.lang})</option>`).join('');
+  sel.value = cfg.voiceURI;
+}
+if ('speechSynthesis' in window) {
+  loadVoices();
+  speechSynthesis.onvoiceschanged = loadVoices;
+}
+function pickVoice() {
+  if (cfg.voiceURI) { const v = voices.find(v => v.voiceURI === cfg.voiceURI); if (v) return v; }
+  const prefs = ['Kate', 'Serena', 'Martha', 'Moira', 'Google UK English Female', 'Karen', 'Tessa', 'Samantha'];
+  for (const n of prefs) { const v = voices.find(v => v.name.startsWith(n)); if (v) return v; }
+  return voices.find(v => /^en/i.test(v.lang)) || null;
+}
+
+const keepAlive = [];
+function speakTTS(text) {
+  return new Promise(resolve => {
+    if (!('speechSynthesis' in window) || !text.trim()) return resolve();
+    let done = false;
+    const finish = () => { if (!done) { done = true; talk.tts = false; resolve(); } };
+    const parts = (text.match(/[^.!?…]+[.!?…]*["'”’)]*\s*/g) || [text]).map(s => s.trim()).filter(Boolean);
+    const voice = pickVoice();
+    speechSynthesis.cancel();
+    keepAlive.length = 0;
+    parts.forEach((s, i) => {
+      const u = new SpeechSynthesisUtterance(s);
+      if (voice) { u.voice = voice; u.lang = voice.lang; }
+      u.rate = cfg.rate; u.pitch = cfg.pitch; u.volume = cfg.volume;
+      u.onstart = () => { talk.tts = true; talk.kick = true; };
+      u.onboundary = () => { talk.kick = true; };
+      u.onend = u.onerror = () => { talk.tts = false; if (i === parts.length - 1) finish(); };
+      keepAlive.push(u);
+      speechSynthesis.speak(u);
+    });
+    setTimeout(finish, 4000 + text.length * 110 / cfg.rate);   // safety net
+  });
+}
+
+async function playClip(blob) {
+  initAudio();
+  if (!ac) return;
+  await ac.resume();
+  const buf = await ac.decodeAudioData(await blob.arrayBuffer());
+  master.gain.value = cfg.volume;
+  return new Promise(resolve => {
+    const src = ac.createBufferSource();
+    src.buffer = buf;
+    src.connect(analyser);
+    src.onended = () => { talk.clip = false; if (currentSrc === src) currentSrc = null; resolve(); };
+    currentSrc = src;
+    talk.clip = true;
+    src.start();
+  });
+}
+
+function chime() {
+  if (!ac) return;
+  const t = ac.currentTime;
+  const out = ac.createGain(); out.gain.value = 0.16 * cfg.volume; out.connect(ac.destination);
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(98, t); o.frequency.exponentialRampToValueAtTime(196, t + 1.3);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.6, t + 0.35); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.8);
+  o.connect(g).connect(out); o.start(t); o.stop(t + 1.9);
+  const notes = [1318.5, 1567.98, 1975.53, 2349.32, 2637.02, 3135.96, 3951.07];
+  notes.forEach((f, i) => {
+    const s = t + 0.08 + i * 0.07 + Math.random() * 0.03;
+    const on = ac.createOscillator(), gn = ac.createGain();
+    on.type = 'triangle'; on.frequency.value = f;
+    gn.gain.setValueAtTime(0.0001, s); gn.gain.exponentialRampToValueAtTime(0.22, s + 0.01); gn.gain.exponentialRampToValueAtTime(0.0001, s + 0.9);
+    on.connect(gn).connect(out); on.start(s); on.stop(s + 1);
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ *  Motion detection (front camera, frame differencing)
+ * ------------------------------------------------------------------ */
+const video = document.getElementById('cam');
+const MW = 64, MH = 48, N = MW * MH;
+const mcv = document.createElement('canvas'); mcv.width = MW; mcv.height = MH;
+const mctx = mcv.getContext('2d', { willReadFrequently: true });
+const dbg = document.getElementById('dbg').getContext('2d');
+const dbgImg = dbg.createImageData(MW, MH);
+let prevGray = null, prevMean = 0;
+const hist = [];
+
+function cameraHelp(e) {
+  const name = (e && e.name) || String(e);
+  let why;
+  if (!window.isSecureContext || !navigator.mediaDevices) {
+    why = 'This page was opened from <b>' + location.protocol + '//' + location.host + '</b>, which is not secure. ' +
+          'Browsers only allow the camera on <b>https://</b> pages (or http://localhost on the same computer). ' +
+          'Opening the file directly or through a local network address will not work.';
+  } else if (name === 'NotAllowedError' || name === 'SecurityError') {
+    why = 'Camera permission was denied or blocked. On iPad: Settings &rarr; Safari &rarr; Camera &rarr; Allow, ' +
+          'then reload. (Preview panes inside other apps often block the camera entirely.)';
+  } else if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+    why = 'No usable front camera was found.';
+  } else if (name === 'NotReadableError') {
+    why = 'The camera is in use by another app. Close other camera apps and reload.';
+  } else {
+    why = 'Unexpected error.';
+  }
+  return 'Camera unavailable (' + name + ').<br>' + why + '<br>For now, tapping the screen wakes the portrait.';
+}
+
+async function startCamera() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw { name: 'InsecureContext' };
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } }, audio: false,
+    });
+  } catch (e) {
+    if (e.name !== 'OverconstrainedError' && e.name !== 'NotFoundError') throw e;
+    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+  }
+  video.srcObject = stream;
+  await video.play().catch(() => {});
+  setInterval(sampleMotion, 100);
+}
+
+function sampleMotion() {
+  if (!video.videoWidth || document.hidden) return;
+  mctx.drawImage(video, 0, 0, MW, MH);
+  const d = mctx.getImageData(0, 0, MW, MH).data;
+  const g = new Float32Array(N);
+  let mean = 0;
+  for (let i = 0, j = 0; i < N; i++, j += 4) { g[i] = d[j] * 0.299 + d[j + 1] * 0.587 + d[j + 2] * 0.114; mean += g[i]; }
+  mean /= N;
+  let score = 0, sx = 0, sy = 0, cnt = 0;
+  if (prevGray) {
+    const dm = mean - prevMean;              // cancels auto-exposure shifts
+    for (let i = 0; i < N; i++) {
+      const moving = Math.abs(g[i] - prevGray[i] - dm) > 22;
+      if (moving) { cnt++; sx += i % MW; sy += (i / MW) | 0; }
+      if (cfg.debug) {
+        const k = i * 4, v = g[i] * 0.6;
+        dbgImg.data[k] = moving ? 255 : v; dbgImg.data[k + 1] = moving ? 40 : v; dbgImg.data[k + 2] = moving ? 90 : v; dbgImg.data[k + 3] = 255;
+      }
+    }
+    score = cnt / N * 100;
+  }
+  prevGray = g; prevMean = mean;
+
+  hist.push(score); if (hist.length > 3) hist.shift();
+  const hits = hist.filter(s => s >= cfg.sensitivity).length;
+  const near = Math.max(...hist) >= cfg.nearLevel;
+  if (cnt > 8 && score >= cfg.sensitivity) {
+    S.lastMotionX = sx / cnt / MW;
+    S.lastMotionY = sy / cnt / MH;
+    S.lastMotionAt = performance.now();
+  }
+  if (hits >= 2) onPresence(score, near);
+
+  if (cfg.debug) {
+    dbg.putImageData(dbgImg, 0, 0);
+    document.querySelector('#meter i').style.width = Math.min(100, score / 60 * 100) + '%';
+    document.querySelector('#meter .trig').style.left = (cfg.sensitivity / 60 * 100) + '%';
+    document.querySelector('#meter .near').style.left = (cfg.nearLevel / 60 * 100) + '%';
+    const cd = Math.max(0, (S.cooldownUntil - performance.now()) / 1000);
+    document.getElementById('dbgText').textContent =
+      `motion ${score.toFixed(1)}%  ${S.mode}${S.mode === 'idle' && cd > 0 ? ' (cool ' + cd.toFixed(0) + 's)' : ''}`;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ *  Start, wake lock, input
+ * ------------------------------------------------------------------ */
+let wakeLock = null;
+async function keepAwake() {
+  try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => { if (started && document.visibilityState === 'visible') keepAwake(); });
+
+document.getElementById('startBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('startMsg');
+  initAudio();
+  try { await ac?.resume(); } catch (e) {}
+  // unlock speech on iOS: first utterance must come from a tap
+  try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch (e) {}
+  try {
+    const el = document.documentElement;
+    (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el)?.catch?.(() => {});
+  } catch (e) {}
+  keepAwake();
+  started = true;
+  try {
+    await startCamera();
+    document.getElementById('start').style.display = 'none';
+  } catch (e) {
+    msg.className = 'err';
+    msg.innerHTML = cameraHelp(e);
+    document.getElementById('startBtn').textContent = 'Continue in tap mode';
+    document.getElementById('startBtn').onclick = () => { document.getElementById('start').style.display = 'none'; };
+  }
+});
+
+if (!window.isSecureContext) {
+  const m = document.getElementById('startMsg');
+  m.className = 'err';
+  m.innerHTML = cameraHelp({ name: 'InsecureContext' });
+}
+
+// 5 quick taps in the top-left corner opens settings
+let cornerTaps = [];
+document.getElementById('stage').addEventListener('pointerdown', e => {
+  if (e.clientX < 100 && e.clientY < 100) {
+    const now = performance.now();
+    cornerTaps = cornerTaps.filter(t => now - t < 3000); cornerTaps.push(now);
+    if (cornerTaps.length >= 5) { cornerTaps = []; openSettings(); }
+    return;
+  }
+  if (started && cfg.tapTrigger && !paused && S.mode === 'idle') wake(true);
+});
+window.addEventListener('keydown', e => {
+  if (e.target.matches && e.target.matches('input,textarea,select')) return;
+  if (e.key === 's' || e.key === 'S') settingsEl.classList.contains('open') ? closeSettings() : openSettings();
+  if (e.key === ' ' && started) { e.preventDefault(); if (S.mode === 'idle') wake(false); }
+});
+
+/* ------------------------------------------------------------------ *
+ *  Settings UI
+ * ------------------------------------------------------------------ */
+const settingsEl = document.getElementById('settings');
+function applyBodyClasses() {
+  document.body.classList.toggle('framed', !!cfg.framed);
+  document.body.classList.toggle('debug', !!cfg.debug);
+  dirty = true;
+}
+function openSettings() {
+  paused = true;
+  goSleep();
+  syncInputs(); renderLines();
+  settingsEl.classList.add('open');
+}
+function closeSettings() {
+  settingsEl.classList.remove('open');
+  paused = false;
+  S.cooldownUntil = performance.now() + 1500;
+}
+document.getElementById('closeSettings').onclick = closeSettings;
+
+function fmt(k, v) { return k === 'sensitivity' || k === 'nearLevel' ? v + '%' : String(v); }
+function syncInputs() {
+  settingsEl.querySelectorAll('[data-k]').forEach(el => {
+    const k = el.dataset.k;
+    if (el.type === 'checkbox') el.checked = !!cfg[k]; else el.value = cfg[k];
+    const val = el.nextElementSibling;
+    if (val && val.classList.contains('val')) val.textContent = fmt(k, cfg[k]);
+  });
+}
+settingsEl.querySelectorAll('[data-k]').forEach(el => {
+  el.addEventListener('input', () => {
+    const k = el.dataset.k;
+    cfg[k] = el.type === 'checkbox' ? el.checked : (el.type === 'range' || el.type === 'number') ? parseFloat(el.value) || 0 : el.value;
+    const val = el.nextElementSibling;
+    if (val && val.classList.contains('val')) val.textContent = fmt(k, cfg[k]);
+    saveSettings(); applyBodyClasses();
+  });
+});
+
+let recorder = null;
+function renderLines() {
+  for (const kind of ['short', 'long']) {
+    const box = document.getElementById('lines-' + kind);
+    box.innerHTML = '';
+    cfg.lines[kind].forEach(line => {
+      const item = document.createElement('div');
+      item.className = 'line-item';
+      const has = clipIds.has(line.id);
+      item.innerHTML = `
+        <textarea placeholder="Type a line"></textarea>
+        <div class="tools">
+          <button class="btn" data-a="play">▶ Play</button>
+          <button class="btn rec" data-a="rec">🎙 Record</button>
+          <button class="btn" data-a="file">📁 File</button>
+          ${has ? '<button class="btn" data-a="unclip">Remove recording</button>' : ''}
+          <span class="tag ${has ? '' : 'none'}">${has ? '● Uses recording' : 'TTS voice'}</span>
+          <span style="flex:1"></span>
+          <button class="btn danger" data-a="del">Delete</button>
+          <input type="file" accept="audio/*" hidden>
+        </div>`;
+      const ta = item.querySelector('textarea');
+      ta.value = line.text;
+      ta.addEventListener('input', () => { line.text = ta.value; saveSettings(); });
+      const fileIn = item.querySelector('input[type=file]');
+      fileIn.addEventListener('change', async () => {
+        if (fileIn.files[0]) { await clipPut(line.id, fileIn.files[0]); renderLines(); }
+      });
+      item.querySelector('.tools').addEventListener('click', async e => {
+        const a = e.target.dataset.a;
+        if (a === 'play') { closeSettings(); S.cooldownUntil = 0; wake(kind === 'long', line); }
+        if (a === 'file') fileIn.click();
+        if (a === 'unclip') { await clipDel(line.id); renderLines(); }
+        if (a === 'del') {
+          cfg.lines[kind] = cfg.lines[kind].filter(l => l !== line);
+          clipDel(line.id).catch(() => {}); saveSettings(); renderLines();
+        }
+        if (a === 'rec') toggleRecord(line, e.target);
+      });
+      box.appendChild(item);
+    });
+  }
+}
+async function toggleRecord(line, btn) {
+  if (recorder && recorder.state === 'recording') { recorder.stop(); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true } });
+    const mime = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'].find(m => window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || '';
+    recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+    const chunks = [];
+    recorder.ondataavailable = e => e.data.size && chunks.push(e.data);
+    recorder.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      const blob = new Blob(chunks, { type: recorder.mimeType || mime || 'audio/mp4' });
+      recorder = null;
+      if (blob.size > 0) await clipPut(line.id, blob);
+      renderLines();
+    };
+    recorder.start();
+    btn.classList.add('on'); btn.textContent = '⏹ Stop';
+  } catch (e) {
+    alert('Microphone unavailable: ' + (e.message || e));
+  }
+}
+settingsEl.querySelectorAll('[data-add]').forEach(b => b.onclick = () => {
+  cfg.lines[b.dataset.add].push({ id: uid(), text: '' }); saveSettings(); renderLines();
+});
+settingsEl.querySelectorAll('[data-test]').forEach(b => b.onclick = () => {
+  closeSettings(); S.cooldownUntil = 0; wake(b.dataset.test === 'long');
+});
+document.getElementById('resetBtn').onclick = () => {
+  if (!confirm('Reset all settings and lines to defaults? Recordings will be deleted.')) return;
+  cfg.lines.short.concat(cfg.lines.long).forEach(l => clipDel(l.id).catch(() => {}));
+  cfg = structuredClone(DEFAULTS);
+  cfg.lines.short.forEach(l => l.id = uid()); cfg.lines.long.forEach(l => l.id = uid());
+  saveSettings(); syncInputs(); renderLines(); loadVoices(); applyBodyClasses();
+};
+
+applyBodyClasses();
+syncInputs();
+
+// hook for testing in a desktop browser without a camera
+window.portrait = { wake, state: S, anim: A };
+})();
+</script>
+</body>
+</html>
